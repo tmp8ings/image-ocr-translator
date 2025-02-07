@@ -34,17 +34,15 @@
         border-color: #999;
       }
       .loading {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
         display: none;
-        width: 30px;
-        height: 30px;
-        border: 3px solid #f3f3f3;
-        border-top: 3px solid #3498db;
+        width: 40px;           /* Increased from 30px */
+        height: 40px;          /* Increased from 30px */
+        border: 4px solid #f3f3f3;    /* Increased from 3px */
+        border-top: 4px solid #3498db; /* Increased from 3px */
         border-radius: 50%;
         animation: spin 1s linear infinite;
+        align-self: center;
+        margin: 0 auto;  /* Add this line to center horizontally */
       }
       @keyframes spin {
         0% {
@@ -82,7 +80,11 @@
     <h1>Gemini API Example</h1>
 
     <!-- Combined API Key & Model Selection on one line -->
-    <div class="input-section" id="credentials" style="display: flex; align-items: center; gap: 1rem;">
+    <div
+      class="input-section"
+      id="credentials"
+      style="display: flex; align-items: center; gap: 1rem"
+    >
       <div>
         <label for="apiKey">API Key:</label>
         <input type="password" id="apiKey" placeholder="Enter your API key" />
@@ -91,10 +93,18 @@
       <div>
         <label for="modelSelect">Select Model:</label>
         <select id="modelSelect">
-          <option value="gemini-2.0-flash">gemini-2.0-flash(요금 발생 가능)</option>
-          <option value="gemini-2.0-flash-lite-preview-02-05">gemini-2.0-flash-lite-preview-02-05</option>
-          <option value="gemini-2.0-pro-exp-02-05">gemini-2.0-pro-exp-02-05</option>
-          <option value="gemini-2.0-flash-thinking-exp-01-21">gemini-2.0-flash-thinking-exp-01-21</option>
+          <option value="gemini-2.0-flash">
+            gemini-2.0-flash(요금 발생 가능)
+          </option>
+          <option value="gemini-2.0-flash-lite-preview-02-05">
+            gemini-2.0-flash-lite-preview-02-05
+          </option>
+          <option value="gemini-2.0-pro-exp-02-05">
+            gemini-2.0-pro-exp-02-05
+          </option>
+          <option value="gemini-2.0-flash-thinking-exp-01-21">
+            gemini-2.0-flash-thinking-exp-01-21
+          </option>
           <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
         </select>
       </div>
@@ -171,7 +181,8 @@
         }
         if (prompt) {
           try {
-            document.getElementById("content").value = decodeURIComponent(prompt);
+            document.getElementById("content").value =
+              decodeURIComponent(prompt);
             localStorage.setItem("prompt", prompt);
           } catch (e) {
             console.error("Error decoding prompt:", e);
@@ -211,11 +222,14 @@
           }
           localStorage.setItem("model", model);
           // Update URL to contain model only (omit API key)
-          const newUrl = window.location.pathname + "?model=" + encodeURIComponent(model);
+          const newUrl =
+            window.location.pathname + "?model=" + encodeURIComponent(model);
           window.history.pushState({}, "", newUrl);
-          document.getElementById("output").textContent = "API Key set successfully";
+          document.getElementById("output").textContent =
+            "API Key set successfully";
         } else {
-          document.getElementById("output").textContent = "Please enter an API key";
+          document.getElementById("output").textContent =
+            "Please enter an API key";
         }
       }
 
@@ -228,7 +242,8 @@
           localStorage.setItem("prompt", encodeURIComponent(content));
           localStorage.setItem("tnote", encodeURIComponent(tnote));
           localStorage.setItem("model", model);
-          const newUrl = window.location.pathname + "?model=" + encodeURIComponent(model);
+          const newUrl =
+            window.location.pathname + "?model=" + encodeURIComponent(model);
           window.history.pushState({}, "", newUrl);
         }
       }
@@ -291,33 +306,39 @@
       function compressImage(file, callback) {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = function(e) {
+        reader.onload = function (e) {
           const img = new Image();
           img.src = e.target.result;
-          img.onload = function() {
-            const canvas = document.createElement('canvas');
+          img.onload = function () {
+            const canvas = document.createElement("canvas");
             // Scale down dimensions (adjust scale factor as needed)
             const scaleFactor = 0.7;
             canvas.width = img.width * scaleFactor;
             canvas.height = img.height * scaleFactor;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             // Compress to JPEG with quality 0.7
-            canvas.toBlob(function(blob) {
-              callback(blob);
-            }, 'image/jpeg', 0.7);
+            canvas.toBlob(
+              function (blob) {
+                callback(blob);
+              },
+              "image/jpeg",
+              0.7
+            );
           };
         };
       }
 
       // Modified function to handle image file compression if size exceeds 18MB
       function handleImageFile(file) {
-        console.log('getting immage...');
-        console.log(file.size)
+        console.log("getting immage...");
+        console.log(file.size);
         if (file.size > 15 * 1024 * 1024) {
-          console.log('need to compress!');
-          compressImage(file, function(compressedBlob) {
-            const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+          console.log("need to compress!");
+          compressImage(file, function (compressedBlob) {
+            const compressedFile = new File([compressedBlob], file.name, {
+              type: "image/jpeg",
+            });
             const imageInput = document.getElementById("imageInput");
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(compressedFile);
@@ -334,14 +355,16 @@
       }
 
       // Listen for Ctrl+Enter to trigger translation
-      document.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'Enter') {
+      document.addEventListener("keydown", function (e) {
+        if (e.ctrlKey && e.key === "Enter") {
           startTranslation();
         }
       });
 
       // Listen for changes on the model select element to update URL and localStorage
-      document.getElementById("modelSelect").addEventListener("change", updateUrl);
+      document
+        .getElementById("modelSelect")
+        .addEventListener("change", updateUrl);
     </script>
   </body>
 </html>
