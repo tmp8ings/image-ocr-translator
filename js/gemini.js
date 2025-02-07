@@ -103,7 +103,7 @@ const translateContent = async (tnote, prompt) => {
   const outputElement = document.getElementById("output");
   const translateButton = document.getElementById("translateButton");
   if (translateButton) translateButton.disabled = true;
-  
+
   try {
     if (loadingElement) {
       // Use CSS spinner without inserting HTML markup
@@ -117,7 +117,7 @@ const translateContent = async (tnote, prompt) => {
         outputElement.removeChild(outputElement.lastChild);
       }
     }
-    
+
     if (!window.apiKey) {
       if (outputElement) {
         outputElement.innerHTML = "Please set API key first";
@@ -125,6 +125,7 @@ const translateContent = async (tnote, prompt) => {
       return;
     }
     let imageBase64 = null;
+    console.log(imageInput.files);
     if (prompt.includes('{{slot::image}}')) {
       const imageInput = document.getElementById('imageInput');
       if (imageInput.files.length > 0) {
@@ -136,7 +137,7 @@ const translateContent = async (tnote, prompt) => {
     const model = document.getElementById("modelSelect").value;
     const body = createBody(tnote, prompt, imageBase64);
     console.log(body);
-    
+
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${window.apiKey}`, {
         method: "POST",
@@ -149,7 +150,10 @@ const translateContent = async (tnote, prompt) => {
         },
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error("Network response was not ok");
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Network response was not ok\n${text}`);
+      }
       const symbols = await response.json();
       let result = symbols.candidates[0].content.parts[0].text;
       result = result.replace(/<[^>]*>/g, '').trim();
