@@ -42,7 +42,7 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
         align-self: center;
-        margin: 0 auto;  /* Add this line to center horizontally */
+        margin: 20px auto;
       }
       @keyframes spin {
         0% {
@@ -129,9 +129,9 @@
     <!-- Enlarged Translate Button right below image input -->
     <div class="translation-container">
       <button id="translateButton" onclick="startTranslation()">Translate</button>
-      <div class="loading" id="loading"></div>
     </div>
 
+    <div class="loading" id="loading"></div>
     <!-- Translation Result Output -->
     <div id="output">
       Enter API key to start
