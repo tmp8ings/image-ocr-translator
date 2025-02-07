@@ -1,88 +1,21 @@
 function createBody(tnote, prompt, imageBase64) {
-  // Parse blocks using regex
-  const blocks = prompt.match(/<\|im_start\|>(.*?)<\|im_end\|>/gs) || [];
 
-  // Initialize structure
-  const body = {
-    contents: [],
-    generation_config: {
-      maxOutputTokens: 8192,
-      temperature: 0,
-    },
-    safetySettings: [
-      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-      { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-    ]
+  const generation_config = {
+    maxOutputTokens: 8192,
+    temperature: 0,
   };
+  const safetySettings = [
+    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+  ];
 
   // Process each block
-  const tempContents = [];
-  blocks.forEach(block => {
-    const cleanBlock = block.replace(/<\|im_start\|>|\n?<\|im_end\|>/g, '');
-    const [role, ...message] = cleanBlock.split('\n');
-    const text = message.join('\n').trim();
+  const { systemInstruction, contents } = risuToGemini(prompt, tnote, imageBase64);
 
-    if (role.startsWith('system')) {
-      body.systemInstruction = {
-        parts: [{ text: text.replace('{{slot::tnote}}', tnote) }]
-      };
-    } else if (role.startsWith('assistant')) {
-      const hasThoughts = text.includes('<Thoughts>');
-      let cleanThoughts = null;
-      if (hasThoughts) {
-        const [thoughts, response] = text.split('</Thoughts>');
-        cleanThoughts = thoughts.replace('<Thoughts>', '');
-        const trimmedResponse = response.trim();
-        tempContents.push({
-          role: 'MODEL',
-          parts: [
-            { text: cleanThoughts },
-            { text: trimmedResponse || null }
-          ]
-        });
-      } else {
-        tempContents.push({
-          role: 'MODEL',
-          parts: [{ text }]
-        });
-      }
-    } else if (role.startsWith('user')) {
-      if (text.includes('{{slot::image}}')) {
-        tempContents.push({
-          role: 'USER',
-          parts: [{
-            inline_data: {
-              mime_type: "image/jpeg",
-              data: imageBase64
-            }
-          }]
-        });
-      } else {
-        tempContents.push({
-          role: 'USER',
-          parts: [{ text: text.replace('{{slot::tnote}}', tnote) }]
-        });
-      }
-    }
-  });
-
-  // Merge consecutive same roles
-  for (let i = 0; i < tempContents.length; i++) {
-    const current = tempContents[i];
-    if (i === 0 || current.role !== tempContents[i - 1].role) {
-      body.contents.push({
-        role: current.role,
-        parts: [...current.parts]
-      });
-    } else {
-      body.contents[body.contents.length - 1].parts.push(...current.parts);
-    }
-  }
-
-  return body;
+  return { generation_config, safetySettings, systemInstruction, contents };
 }
 
 const getBase64 = (file) => {
@@ -186,4 +119,85 @@ const translateContent = async (tnote, prompt) => {
     // Re-enable the translate button when loading is finished
     if (translateButton) translateButton.disabled = false;
   }
+}
+
+function risuToGemini(prompt, tnote, imageBase64) {
+  const blocks = prompt.match(/<\|im_start\|>(.*?)<\|im_end\|>/gs) || [];
+  const tempContents = [];
+  const result = {
+    contents: [],
+    systemInstruction: '',
+  }
+  blocks.forEach(block => {
+    const cleanBlock = block.replace(/<\|im_start\|>|\n?<\|im_end\|>/g, '');
+    const [role, ...message] = cleanBlock.split('\n');
+    const text = message.join('\n').trim().replaceAll('{{slot::tnote}}', tnote);
+
+    if (role.startsWith('system')) {
+      result.systemInstruction = {
+        parts: [{ text }]
+      };
+    } else if (role.startsWith('assistant')) {
+      const hasThoughts = text.includes('<Thoughts>');
+      let cleanThoughts = null;
+      if (hasThoughts) {
+        const [thoughts, response] = text.split('</Thoughts>');
+        cleanThoughts = thoughts.replace('<Thoughts>', '');
+        const trimmedResponse = response.trim();
+        tempContents.push({
+          role: 'MODEL',
+          parts: [
+            { text: cleanThoughts },
+            { text: trimmedResponse || null }
+          ]
+        });
+      } else {
+        tempContents.push({
+          role: 'MODEL',
+          parts: [{ text }]
+        });
+      }
+    } else if (role.startsWith('user')) {
+      if (text.includes('{{slot::image}}')) {
+        const [beforeImage, afterImage] = text.split('{{slot::image}}');
+        const parts = [];
+        if (beforeImage.trim()) {
+          parts.push({ text: beforeImage.trim() });
+        }
+        parts.push({
+          inline_data: {
+            mime_type: "image/jpeg",
+            data: imageBase64
+          }
+        });
+        if (afterImage.trim()) {
+          parts.push({ text: afterImage.trim() });
+        }
+        tempContents.push({
+          role: 'USER',
+          parts: parts
+        });
+      } else {
+        tempContents.push({
+          role: 'USER',
+          parts: [{ text: text.replace('{{slot::tnote}}', tnote) }]
+        });
+      }
+    }
+  });
+
+  // Merge consecutive same roles
+  for (let i = 0; i < tempContents.length; i++) {
+    const current = tempContents[i];
+    if (i === 0 || current.role !== tempContents[i - 1].role) {
+      result.contents.push({
+        role: current.role,
+        parts: [...current.parts]
+      });
+    } else {
+      result.contents[result.contents.length - 1].parts.push(...current.parts);
+    }
+  }
+
+  return result;
 }
