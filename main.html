@@ -157,6 +157,26 @@
       ></textarea>
     </div>
 
+    <div style="margin-bottom: 10px;">
+      <button id="togglePromptStyle" onclick="togglePromptStyle()">Switch to ChatBlock</button>
+    </div>
+
+    <!-- ChatBlock container, hidden by default -->
+    <div id="chatBlockContainer" style="display: none;">
+      <label for="systemInstruction">System Instruction:</label>
+      <textarea id="systemInstruction" placeholder="Enter system instruction"></textarea>
+      <div id="chatContentBlocks">
+        <div class="chatBlockRow">
+          <select class="chatBlockRoleSelect">
+            <option value="user">User</option>
+            <option value="assistant">Assistant</option>
+          </select>
+          <textarea class="chatBlockText" placeholder="Enter text"></textarea>
+        </div>
+      </div>
+      <button id="addChatBlockBtn" onclick="addChatBlock()">Add Another Block</button>
+    </div>
+
     <!-- Update script src to use absolute path -->
     <script src="./js/gemini.js"></script>
     <script>
@@ -195,15 +215,44 @@
       };
 
       function startTranslation() {
-        const tnote = document.getElementById("tnote").value;
-        const content = document.getElementById("content").value;
-        const model = document.getElementById("modelSelect").value;
-        if (!content) {
-          document.getElementById("output").textContent =
-            "Please enter content to translate";
-          return;
+        const chatBlockContainer = document.getElementById("chatBlockContainer");
+        let contentToTranslate;
+        if (chatBlockContainer.style.display === "none") {
+          // Risu style
+          const tnote = document.getElementById("tnote").value;
+          const content = document.getElementById("content").value;
+          const model = document.getElementById("modelSelect").value;
+          if (!content) {
+            document.getElementById("output").textContent =
+              "Please enter content to translate";
+            return;
+          }
+          contentToTranslate = content;
+        } else {
+          // ChatBlock style
+          const systemInstruction = document.getElementById("systemInstruction").value;
+          const blocks = [...document.querySelectorAll("#chatContentBlocks .chatBlockRow")].map(row => {
+            const role = row.querySelector(".chatBlockRoleSelect").value;
+            const text = row.querySelector(".chatBlockText").value;
+            return { role, text };
+          });
+          // Convert to Risu using chatBlockToRisu
+          // We'll build a partial chatBlock object here:
+          const chatBlock = {
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents: blocks.map(b => ({
+              role: b.role.toUpperCase(),
+              parts: [{ text: b.text }]
+            }))
+          };
+          contentToTranslate = chatBlockToRisu(
+            chatBlock.systemInstruction,
+            chatBlock.contents
+          );
+          document.getElementById("content").value = contentToTranslate;
         }
-        translateContent(tnote, content, model);
+        const model = document.getElementById("modelSelect").value;
+        translateContent(tnote, contentToTranslate, model);
       }
 
       function setApiKey() {
@@ -365,6 +414,63 @@
       document
         .getElementById("modelSelect")
         .addEventListener("change", updateUrl);
+
+      function togglePromptStyle() {
+        const promptArea = document.getElementById("content");
+        const chatBlockContainer = document.getElementById("chatBlockContainer");
+        const btn = document.getElementById("togglePromptStyle");
+        if (chatBlockContainer.style.display === "none") {
+          // Switching to ChatBlock: parse existing Risu prompt
+          const risuPrompt = promptArea.value;
+          const { systemInstruction, contents } = risuToChatBlock(risuPrompt);
+          document.getElementById("systemInstruction").value =
+            (systemInstruction && systemInstruction.parts[0]?.text) || "";
+          const container = document.getElementById("chatContentBlocks");
+          container.innerHTML = "";
+          contents.forEach(block => {
+            const row = document.createElement("div");
+            row.className = "chatBlockRow";
+            row.innerHTML = `
+              <select class="chatBlockRoleSelect">
+                <option value="user" ${block.role === "USER" ? "selected" : ""}>User</option>
+                <option value="assistant" ${block.role === "MODEL" ? "selected" : ""}>Assistant</option>
+              </select>
+              <textarea class="chatBlockText">${block.parts.map(p => p.text).join("\n")}</textarea>
+            `;
+            container.appendChild(row);
+          });
+          chatBlockContainer.style.display = "block";
+          promptArea.style.display = "none";
+          btn.textContent = "Switch to Risu";
+        } else {
+          // Switching to Risu: parse existing chatBlock
+          const systemInstruction = document.getElementById("systemInstruction").value;
+          const blocks = [...document.querySelectorAll("#chatContentBlocks .chatBlockRow")].map(row => {
+            const role = row.querySelector(".chatBlockRoleSelect").value;
+            const text = row.querySelector(".chatBlockText").value;
+            return { role: role.toUpperCase(), parts: [{ text }] };
+          });
+          const risu = chatBlockToRisu({ parts: [{ text: systemInstruction }] }, blocks);
+          promptArea.value = risu;
+          chatBlockContainer.style.display = "none";
+          promptArea.style.display = "block";
+          btn.textContent = "Switch to ChatBlock";
+        }
+      }
+
+      function addChatBlock() {
+        const container = document.getElementById("chatContentBlocks");
+        const row = document.createElement("div");
+        row.className = "chatBlockRow";
+        row.innerHTML = `
+          <select class="chatBlockRoleSelect">
+            <option value="user">User</option>
+            <option value="assistant">Assistant</option>
+          </select>
+          <textarea class="chatBlockText" placeholder="Enter text"></textarea>
+        `;
+        container.appendChild(row);
+      }
     </script>
   </body>
 </html>
