@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Add base URL for GitHub Pages -->
+    <title>Gemini API Example</title>
+    <style>
+      textarea {
+        width: 100%;
+        min-height: 100px;
+        margin: 10px 0;
+      }
+      .input-section {
+        margin: 20px 0;
+      }
+      .image-section {
+        margin: 20px 0;
+      }
+      #imagePreview {
+        display: block;
+        margin: 10px auto;
+        max-width: none;
+        max-height: none;
+      }
+      .drop-zone {
+        border: 2px dashed #ccc;
+        padding: 20px;
+        text-align: center;
+        background: #f8f8f8;
+        cursor: pointer;
+      }
+      .drop-zone.dragover {
+        background: #e1e1e1;
+        border-color: #999;
+      }
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      /* New styles for translation result output */
+      #output {
+        margin: 20px auto;
+        padding: 15px;
+        width: 90%;
+        max-width: 600px;
+        min-height: 150px;
+        border: 1px solid #ccc;
+        background-color: #f5f5f5;
+        font-size: 16px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        position: relative;
+      }
+      /* Style for enlarged translate button */
+      #translateButton {
+        width: 100%;
+        padding: 15px;
+        font-size: 18px;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Gemini API Example</h1>
+
+    <!-- Combined API Key & Model Selection on one line -->
+    <div class="input-section" id="credentials" style="display: flex; align-items: center; gap: 1rem;">
+      <div>
+        <label for="apiKey">API Key:</label>
+        <input type="password" id="apiKey" placeholder="Enter your API key" />
+        <button onclick="setApiKey()">Set Key</button>
+      </div>
+      <div>
+        <label for="modelSelect">Select Model:</label>
+        <select id="modelSelect">
+          <option value="gemini-2.0-flash">gemini-2.0-flash(요금 발생 가능)</option>
+          <option value="gemini-2.0-flash-lite-preview-02-05">gemini-2.0-flash-lite-preview-02-05</option>
+          <option value="gemini-2.0-pro-exp-02-05">gemini-2.0-pro-exp-02-05</option>
+          <option value="gemini-2.0-flash-thinking-exp-01-21">gemini-2.0-flash-thinking-exp-01-21</option>
+          <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Image Input Section -->
+    <div class="image-section">
+      <label>Image to Process:</label>
+      <div id="dropZone" class="drop-zone">
+        Drop image here or click to select
+        <input
+          type="file"
+          id="imageInput"
+          accept="image/*"
+          style="display: none"
+        />
+        <img id="imagePreview" alt="Preview" />
+      </div>
+      <div><small>You can also paste image from clipboard (Ctrl+V)</small></div>
+    </div>
+
+    <!-- Enlarged Translate Button right below image input -->
+    <div class="translation-container">
+      <button id="translateButton" onclick="startTranslation()">Translate</button>
+      <div class="loading" id="loading"></div>
+    </div>
+
+    <!-- Translation Result Output -->
+    <div id="output">
+      Enter API key to start
+    </div>
+
+    <!-- Translation Notes -->
+    <div class="input-section">
+      <label for="tnote">Translation Notes:</label>
+      <textarea
+        id="tnote"
+        placeholder="Enter translation notes/context"
+        oninput="updateUrl()"
+      ></textarea>
+    </div>
+
+    <!-- Prompt Input -->
+    <div class="input-section">
+      <label for="content">Prompt:</label>
+      <textarea
+        id="content"
+        placeholder="Enter prompt"
+        oninput="updateUrl()"
+      ></textarea>
+    </div>
+
+    <!-- Update script src to use absolute path -->
+    <script src="./js/gemini.js"></script>
+    <script>
+      // window.onload: load values from URL (if present) and localStorage (fallback)
+      window.onload = function () {
+        const params = new URLSearchParams(window.location.search);
+        const key = params.get("key") || localStorage.getItem("apiKey");
+        const prompt = params.get("prompt") || localStorage.getItem("prompt");
+        const tnote = params.get("tnote") || localStorage.getItem("tnote");
+        const modelParam = params.get("model") || localStorage.getItem("model");  // new
+
+        if (key) {
+          document.getElementById("apiKey").value = key;
+          window.apiKey = key;
+          document.getElementById("output").textContent = "API Key loaded";
+          localStorage.setItem("apiKey", key);
+        }
+
+        if (modelParam) {  // new
+          document.getElementById("modelSelect").value = modelParam;
+          localStorage.setItem("model", modelParam);
+        }
+
+        if (prompt) {
+          try {
+            document.getElementById("content").value = decodeURIComponent(prompt);
+            localStorage.setItem("prompt", prompt);
+          } catch (e) {
+            console.error("Error decoding prompt:", e);
+          }
+        }
+
+        if (tnote) {
+          document.getElementById("tnote").value = decodeURIComponent(tnote);
+          localStorage.setItem("tnote", tnote);
+        }
+      };
+
+      function startTranslation() {
+        const tnote = document.getElementById("tnote").value;
+        const content = document.getElementById("content").value;
+        const model = document.getElementById("modelSelect").value;
+        if (!content) {
+          document.getElementById("output").textContent =
+            "Please enter content to translate";
+          return;
+        }
+        translateContent(tnote, content, model);
+      }
+
+      function setApiKey() {
+        const key = document.getElementById("apiKey").value;
+        const content = document.getElementById("content").value;
+        const tnote = document.getElementById("tnote").value;
+        const model = document.getElementById("modelSelect").value;  // new
+        if (key) {
+          window.apiKey = key;
+          localStorage.setItem("apiKey", key);
+          if (content) {
+            localStorage.setItem("prompt", encodeURIComponent(content));
+          }
+          if (tnote) {
+            localStorage.setItem("tnote", encodeURIComponent(tnote));
+          }
+          localStorage.setItem("model", model);  // new
+          // Update URL to contain key and model
+          const newUrl =
+            window.location.pathname +
+            "?key=" +
+            encodeURIComponent(key) +
+            "&model=" +
+            encodeURIComponent(model);  // new
+          window.history.pushState({}, "", newUrl);
+          document.getElementById("output").textContent = "API Key set successfully";
+        } else {
+          document.getElementById("output").textContent = "Please enter an API key";
+        }
+      }
+
+      // updateUrl now saves values to localStorage only and ensures the URI remains with key and model
+      function updateUrl() {
+        if (window.apiKey) {
+          const content = document.getElementById("content").value;
+          const tnote = document.getElementById("tnote").value;
+          const model = document.getElementById("modelSelect").value;  // new
+          localStorage.setItem("prompt", encodeURIComponent(content));
+          localStorage.setItem("tnote", encodeURIComponent(tnote));
+          localStorage.setItem("model", model);  // new
+          const newUrl =
+            window.location.pathname +
+            "?key=" +
+            encodeURIComponent(window.apiKey) +
+            "&model=" +
+            encodeURIComponent(model);  // new
+          window.history.pushState({}, "", newUrl);
+        }
+      }
+
+      function previewImage(input) {
+        const preview = document.getElementById("imagePreview");
+        if (input.files && input.files[0]) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            preview.src = e.target.result;
+            preview.style.display = "block";
+          };
+          reader.readAsDataURL(input.files[0]);
+        } else {
+          preview.style.display = "none";
+        }
+      }
+
+      // Clipboard paste handling
+      document.addEventListener("paste", function (e) {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let item of items) {
+          if (item.type.indexOf("image") !== -1) {
+            const file = item.getAsFile();
+            handleImageFile(file);
+            break;
+          }
+        }
+      });
+
+      // Drop zone handling
+      const dropZone = document.getElementById("dropZone");
+
+      dropZone.addEventListener("click", () => {
+        document.getElementById("imageInput").click();
+      });
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith("image/")) {
+          handleImageFile(files[0]);
+        }
+      });
+
+      function handleImageFile(file) {
+        const imageInput = document.getElementById("imageInput");
+        // Create a new FileList containing the dropped file
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        imageInput.files = dataTransfer.files;
+
+        previewImage(imageInput);
+      }
+
+      // Listen for Ctrl+Enter to trigger translation
+      document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+          startTranslation();
+        }
+      });
+
+      // Listen for changes on the model select element to update URL and localStorage
+      document.getElementById("modelSelect").addEventListener("change", updateUrl);
+    </script>
+  </body>
+</html>
