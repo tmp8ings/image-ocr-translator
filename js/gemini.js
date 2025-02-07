@@ -172,10 +172,12 @@ const translateContent = async (tnote, prompt) => {
     }
   } catch (error) {
     console.error("Error:", error);
+    const errorMessage = `${error}` ?? "Error fetching data.";
     if (outputElement) {
+      outputElement.style.display = "block";
       outputElement.innerHTML = error.message.includes('CORS') ?
         "CORS error - Please ensure you're using HTTPS" :
-        "Error fetching data.";
+        errorMessage;
     }
   } finally {
     if (loadingElement) {
