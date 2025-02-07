@@ -13,7 +13,7 @@ function createBody(tnote, prompt, imageBase64) {
   ];
 
   // Process each block
-  const { systemInstruction, contents } = risuToChatBlock(prompt, tnote, imageBase64);
+  const { systemInstruction, contents } = risuToGemini(prompt, tnote, imageBase64);
 
   return { generation_config, safetySettings, systemInstruction, contents };
 }
