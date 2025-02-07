@@ -153,10 +153,11 @@
       // window.onload: load values from URL (if present) and localStorage (fallback)
       window.onload = function () {
         const params = new URLSearchParams(window.location.search);
-        const key = params.get("key") || localStorage.getItem("apiKey");
+        // Removed: API key from URL; use localStorage only.
+        const key = localStorage.getItem("apiKey");
         const prompt = params.get("prompt") || localStorage.getItem("prompt");
         const tnote = params.get("tnote") || localStorage.getItem("tnote");
-        const modelParam = params.get("model") || localStorage.getItem("model");  // new
+        const modelParam = params.get("model") || localStorage.getItem("model");
 
         if (key) {
           document.getElementById("apiKey").value = key;
@@ -164,12 +165,10 @@
           document.getElementById("output").textContent = "API Key loaded";
           localStorage.setItem("apiKey", key);
         }
-
-        if (modelParam) {  // new
+        if (modelParam) {
           document.getElementById("modelSelect").value = modelParam;
           localStorage.setItem("model", modelParam);
         }
-
         if (prompt) {
           try {
             document.getElementById("content").value = decodeURIComponent(prompt);
@@ -178,7 +177,6 @@
             console.error("Error decoding prompt:", e);
           }
         }
-
         if (tnote) {
           document.getElementById("tnote").value = decodeURIComponent(tnote);
           localStorage.setItem("tnote", tnote);
@@ -201,7 +199,7 @@
         const key = document.getElementById("apiKey").value;
         const content = document.getElementById("content").value;
         const tnote = document.getElementById("tnote").value;
-        const model = document.getElementById("modelSelect").value;  // new
+        const model = document.getElementById("modelSelect").value;
         if (key) {
           window.apiKey = key;
           localStorage.setItem("apiKey", key);
@@ -211,14 +209,9 @@
           if (tnote) {
             localStorage.setItem("tnote", encodeURIComponent(tnote));
           }
-          localStorage.setItem("model", model);  // new
-          // Update URL to contain key and model
-          const newUrl =
-            window.location.pathname +
-            "?key=" +
-            encodeURIComponent(key) +
-            "&model=" +
-            encodeURIComponent(model);  // new
+          localStorage.setItem("model", model);
+          // Update URL to contain model only (omit API key)
+          const newUrl = window.location.pathname + "?model=" + encodeURIComponent(model);
           window.history.pushState({}, "", newUrl);
           document.getElementById("output").textContent = "API Key set successfully";
         } else {
@@ -226,21 +219,16 @@
         }
       }
 
-      // updateUrl now saves values to localStorage only and ensures the URI remains with key and model
+      // updateUrl now saves values to localStorage only and ensures the URI remains with model only
       function updateUrl() {
         if (window.apiKey) {
           const content = document.getElementById("content").value;
           const tnote = document.getElementById("tnote").value;
-          const model = document.getElementById("modelSelect").value;  // new
+          const model = document.getElementById("modelSelect").value;
           localStorage.setItem("prompt", encodeURIComponent(content));
           localStorage.setItem("tnote", encodeURIComponent(tnote));
-          localStorage.setItem("model", model);  // new
-          const newUrl =
-            window.location.pathname +
-            "?key=" +
-            encodeURIComponent(window.apiKey) +
-            "&model=" +
-            encodeURIComponent(model);  // new
+          localStorage.setItem("model", model);
+          const newUrl = window.location.pathname + "?model=" + encodeURIComponent(model);
           window.history.pushState({}, "", newUrl);
         }
       }
