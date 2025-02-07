@@ -17,7 +17,7 @@
         margin: 20px 0;
       }
       #imagePreview {
-        display: block;
+        display: none;
         margin: 10px auto;
         max-width: 100%;
         max-height: 100%;
@@ -73,6 +73,47 @@
         padding: 15px;
         font-size: 18px;
         margin: 10px 0;
+      }
+      /* Insert slider CSS */
+      .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 10px;
+        justify-content: center;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+      }
+      .switch input {
+        display: none;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px; width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: #2196F3;
+      }
+      input:checked + .slider:before {
+        transform: translateX(26px);
       }
     </style>
   </head>
@@ -147,10 +188,14 @@
       ></textarea>
     </div>
 
-    <div style="margin-bottom: 10px">
-      <button id="togglePromptStyle" onclick="togglePromptStyle()">
-        Switch to ChatBlock
-      </button>
+    <!-- Remove old toggle button and add slider toggle -->
+    <div class="toggle-container">
+      <span>risu</span>
+      <label class="switch">
+        <input type="checkbox" id="styleToggle">
+        <span class="slider"></span>
+      </label>
+      <span>chatblock</span>
     </div>
 
     <!-- Prompt Input -->
@@ -227,6 +272,39 @@
           document.getElementById("tnote").value = decodeURIComponent(tnote);
           localStorage.setItem("tnote", tnote);
         }
+        // Load style flag from URL or localStorage
+        const styleParam = params.get("style") || localStorage.getItem("style");
+        if (styleParam === "chatblock") {
+          isChatBlockEnabled = true;
+          document.getElementById("styleToggle").checked = true;
+          document.getElementById("chatBlockContainer").style.display = "block";
+          document.getElementById("content").style.display = "none";
+          // Optionally, convert current risu prompt to chatBlock format
+          const risuPrompt = document.getElementById("content").value;
+          const { systemInstruction, contents } = risuToChatBlock(risuPrompt);
+          document.getElementById("systemInstruction").value =
+            (systemInstruction && systemInstruction.parts[0]?.text) || "";
+          const container = document.getElementById("chatContentBlocks");
+          container.innerHTML = "";
+          contents.forEach(block => {
+            const row = document.createElement("div");
+            row.className = "chatBlockRow";
+            row.innerHTML = `
+              <select class="chatBlockRoleSelect">
+                <option value="user" ${block.role === "USER" ? "selected" : ""}>User</option>
+                <option value="assistant" ${block.role === "MODEL" ? "selected" : ""}>Assistant</option>
+              </select>
+              <textarea class="chatBlockText" oninput="updateUrl()">${block.parts.map(p => p.text).join("\n")}</textarea>
+            `;
+            container.appendChild(row);
+          });
+        } else {
+          isChatBlockEnabled = false;
+          document.getElementById("styleToggle").checked = false;
+          document.getElementById("chatBlockContainer").style.display = "none";
+          document.getElementById("content").style.display = "block";
+        }
+        localStorage.setItem("style", isChatBlockEnabled ? "chatblock" : "risu");
       };
 
       function startTranslation() {
@@ -330,8 +408,10 @@
           localStorage.setItem("prompt", encodeURIComponent(content));
           localStorage.setItem("tnote", encodeURIComponent(tnote));
           localStorage.setItem("model", model);
-          const newUrl =
-            window.location.pathname + "?model=" + encodeURIComponent(model);
+          // Save style flag as well
+          const styleFlag = isChatBlockEnabled ? "chatblock" : "risu";
+          localStorage.setItem("style", styleFlag);
+          const newUrl = window.location.pathname + "?model=" + encodeURIComponent(model) + "&style=" + styleFlag;
           window.history.pushState({}, "", newUrl);
         }
       }
@@ -454,63 +534,58 @@
         .getElementById("modelSelect")
         .addEventListener("change", updateUrl);
 
+      // Replace togglePromptStyle call from button click with slider change event
+      document.getElementById("styleToggle").addEventListener("change", function() {
+        togglePromptStyle();
+      });
+
+      // Modify togglePromptStyle to remove button text update
       function togglePromptStyle() {
         const promptArea = document.getElementById("content");
-        const chatBlockContainer =
-          document.getElementById("chatBlockContainer");
-        const btn = document.getElementById("togglePromptStyle");
-        if (!isChatBlockEnabled) {
-          // Switching to ChatBlock style:
-          const risuPrompt = promptArea.value;
-          const { systemInstruction, contents } = risuToChatBlock(risuPrompt);
-          document.getElementById("systemInstruction").value =
-            (systemInstruction && systemInstruction.parts[0]?.text) || "";
-          const container = document.getElementById("chatContentBlocks");
-          container.innerHTML = "";
-          contents.forEach((block) => {
-            const row = document.createElement("div");
-            row.className = "chatBlockRow";
-            row.innerHTML = `
-              <select class="chatBlockRoleSelect">
-                <option value="user" ${
-                  block.role === "USER" ? "selected" : ""
-                }>User</option>
-                <option value="assistant" ${
-                  block.role === "MODEL" ? "selected" : ""
-                }>Assistant</option>
-              </select>
-              <textarea class="chatBlockText" oninput="updateUrl()">${block.parts
-                .map((p) => p.text)
-                .join("\n")}</textarea>
-            `;
-            container.appendChild(row);
-          });
-          chatBlockContainer.style.display = "block";
-          promptArea.style.display = "none";
-          btn.textContent = "Switch to Risu";
-          isChatBlockEnabled = true;
-          updateUrl();
+        const chatBlockContainer = document.getElementById("chatBlockContainer");
+        if (!this || !document.getElementById("styleToggle").checked) {
+          // Slider unchecked: risu style
+          // If switching to risu, and chatBlock is visible, convert chatBlock to risu format
+          if (isChatBlockEnabled) {
+            const systemInstruction = document.getElementById("systemInstruction").value;
+            const blocks = [...document.querySelectorAll("#chatContentBlocks .chatBlockRow")].map(row => {
+              const role = row.querySelector(".chatBlockRoleSelect").value;
+              const text = row.querySelector(".chatBlockText").value;
+              return { role: role.toUpperCase(), parts: [{ text }] };
+            });
+            const risu = chatBlockToRisu({ parts: [{ text: systemInstruction }] }, blocks);
+            promptArea.value = risu;
+            chatBlockContainer.style.display = "none";
+            promptArea.style.display = "block";
+            isChatBlockEnabled = false;
+            updateUrl();
+          }
         } else {
-          // Switching to Risu style:
-          const systemInstruction =
-            document.getElementById("systemInstruction").value;
-          const blocks = [
-            ...document.querySelectorAll("#chatContentBlocks .chatBlockRow"),
-          ].map((row) => {
-            const role = row.querySelector(".chatBlockRoleSelect").value;
-            const text = row.querySelector(".chatBlockText").value;
-            return { role: role.toUpperCase(), parts: [{ text }] };
-          });
-          const risu = chatBlockToRisu(
-            { parts: [{ text: systemInstruction }] },
-            blocks
-          );
-          promptArea.value = risu;
-          chatBlockContainer.style.display = "none";
-          promptArea.style.display = "block";
-          btn.textContent = "Switch to ChatBlock";
-          isChatBlockEnabled = false;
-          updateUrl();
+          // Slider checked: chatblock style
+          if (!isChatBlockEnabled) {
+            const risuPrompt = promptArea.value;
+            const { systemInstruction, contents } = risuToChatBlock(risuPrompt);
+            document.getElementById("systemInstruction").value =
+              (systemInstruction && systemInstruction.parts[0]?.text) || "";
+            const container = document.getElementById("chatContentBlocks");
+            container.innerHTML = "";
+            contents.forEach(block => {
+              const row = document.createElement("div");
+              row.className = "chatBlockRow";
+              row.innerHTML = `
+                <select class="chatBlockRoleSelect">
+                  <option value="user" ${block.role === "USER" ? "selected" : ""}>User</option>
+                  <option value="assistant" ${block.role === "MODEL" ? "selected" : ""}>Assistant</option>
+                </select>
+                <textarea class="chatBlockText" oninput="updateUrl()">${block.parts.map(p => p.text).join("\n")}</textarea>
+              `;
+              container.appendChild(row);
+            });
+            chatBlockContainer.style.display = "block";
+            promptArea.style.display = "none";
+            isChatBlockEnabled = true;
+            updateUrl();
+          }
         }
       }
 
