@@ -127,7 +127,12 @@ function risuToGemini(prompt, tnote, imageBase64) {
   const imageAddedContents = contents.map(block => {
     const parts = block.parts.map(part => {
       if (part.text == '{{slot::image}}') {
-        return { text: imageBase64 };
+        return {
+          inline_data: {
+            mime_type: "image/jpeg",
+            data: imageBase64
+          }
+        }
       }
       return part;
     });
