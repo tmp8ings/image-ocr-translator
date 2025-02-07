@@ -192,6 +192,9 @@
     <!-- Update script src to use absolute path -->
     <script src="./js/gemini.js"></script>
     <script>
+      // Add a global flag for style tracking
+      let isChatBlockEnabled = false;
+
       // window.onload: load values from URL (if present) and localStorage (fallback)
       window.onload = function () {
         const params = new URLSearchParams(window.location.search);
@@ -227,10 +230,8 @@
       };
 
       function startTranslation() {
-        const chatBlockContainer =
-          document.getElementById("chatBlockContainer");
         let contentToTranslate;
-        if (chatBlockContainer.style.display === "none") {
+        if (!isChatBlockEnabled) {
           // Risu style
           const tnote = document.getElementById("tnote").value;
           const content = document.getElementById("content").value;
@@ -268,6 +269,7 @@
           document.getElementById("content").value = contentToTranslate;
         }
         const model = document.getElementById("modelSelect").value;
+        const tnote = document.getElementById("tnote").value;
         translateContent(tnote, contentToTranslate, model);
       }
 
@@ -302,11 +304,9 @@
       function updateUrl() {
         if (window.apiKey) {
           const promptArea = document.getElementById("content");
-          const chatBlockContainer =
-            document.getElementById("chatBlockContainer");
           let content;
-          if (chatBlockContainer.style.display !== "none") {
-            // ChatBlock style active: convert to Risu prompt.
+          if (isChatBlockEnabled) {
+            // If ChatBlock style is enabled, convert using chatBlockToRisu
             const systemInstruction =
               document.getElementById("systemInstruction").value;
             const blocks = [
@@ -320,7 +320,7 @@
               { parts: [{ text: systemInstruction }] },
               blocks
             );
-            promptArea.value = content; // Update hidden prompt
+            promptArea.value = content;
           } else {
             content = promptArea.value;
           }
@@ -459,8 +459,8 @@
         const chatBlockContainer =
           document.getElementById("chatBlockContainer");
         const btn = document.getElementById("togglePromptStyle");
-        if (chatBlockContainer.style.display === "none") {
-          // Switching to ChatBlock: parse existing Risu prompt
+        if (!isChatBlockEnabled) {
+          // Switching to ChatBlock style:
           const risuPrompt = promptArea.value;
           const { systemInstruction, contents } = risuToChatBlock(risuPrompt);
           document.getElementById("systemInstruction").value =
@@ -488,9 +488,10 @@
           chatBlockContainer.style.display = "block";
           promptArea.style.display = "none";
           btn.textContent = "Switch to Risu";
+          isChatBlockEnabled = true;
           updateUrl();
         } else {
-          // Switching to Risu: parse existing chatBlock
+          // Switching to Risu style:
           const systemInstruction =
             document.getElementById("systemInstruction").value;
           const blocks = [
@@ -508,6 +509,7 @@
           chatBlockContainer.style.display = "none";
           promptArea.style.display = "block";
           btn.textContent = "Switch to ChatBlock";
+          isChatBlockEnabled = false;
           updateUrl();
         }
       }
