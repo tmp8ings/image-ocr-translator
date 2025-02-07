@@ -13,7 +13,7 @@ function createBody(tnote, prompt, imageBase64) {
   ];
 
   // Process each block
-  const { systemInstruction, contents } = risuToGemini(prompt, tnote, imageBase64);
+  const { systemInstruction, contents } = risuToChatBlock(prompt, tnote, imageBase64);
 
   return { generation_config, safetySettings, systemInstruction, contents };
 }
@@ -122,6 +122,26 @@ const translateContent = async (tnote, prompt) => {
 }
 
 function risuToGemini(prompt, tnote, imageBase64) {
+  prompt.replaceAll('{{slot::tnote}}', tnote);
+  const { systemInstruction, contents } = risuToChatBlock(prompt);
+  const imageAddedContents = contents.map(block => {
+    const parts = block.parts.map(part => {
+      if (part.text == '{{slot::image}}') {
+        return { text: imageBase64 };
+      }
+      return part;
+    });
+    return { role: block.role, parts };
+  });
+  return { systemInstruction, contents: imageAddedContents };
+}
+
+function chatBlockToGemini(systemInstruction, contents, tnote, imageBase64) {
+  const risu = chatBlockToRisu(systemInstruction, contents);
+  return risuToGemini(risu, tnote, imageBase64);
+}
+
+function risuToChatBlock(prompt) {
   const blocks = prompt.match(/<\|im_start\|>(.*?)<\|im_end\|>/gs) || [];
   const tempContents = [];
   const result = {
@@ -131,7 +151,7 @@ function risuToGemini(prompt, tnote, imageBase64) {
   blocks.forEach(block => {
     const cleanBlock = block.replace(/<\|im_start\|>|\n?<\|im_end\|>/g, '');
     const [role, ...message] = cleanBlock.split('\n');
-    const text = message.join('\n').trim().replaceAll('{{slot::tnote}}', tnote);
+    const text = message.join('\n').trim();
 
     if (role.startsWith('system')) {
       result.systemInstruction = {
@@ -164,12 +184,7 @@ function risuToGemini(prompt, tnote, imageBase64) {
         if (beforeImage.trim()) {
           parts.push({ text: beforeImage.trim() });
         }
-        parts.push({
-          inline_data: {
-            mime_type: "image/jpeg",
-            data: imageBase64
-          }
-        });
+        parts.push({ text: '{{slot::image}}' });
         if (afterImage.trim()) {
           parts.push({ text: afterImage.trim() });
         }
@@ -180,7 +195,7 @@ function risuToGemini(prompt, tnote, imageBase64) {
       } else {
         tempContents.push({
           role: 'USER',
-          parts: [{ text: text.replace('{{slot::tnote}}', tnote) }]
+          parts: [{ text }]
         });
       }
     }
@@ -200,4 +215,35 @@ function risuToGemini(prompt, tnote, imageBase64) {
   }
 
   return result;
+}
+
+
+function chatBlockToRisu(systemInstruction, contents) {
+  let result = "";
+
+  // 처리: systemInstruction 블록 추가
+  if (systemInstruction && systemInstruction.parts) {
+    const systemText = systemInstruction.parts
+      .map(part => part.text)
+      .filter(text => text !== undefined && text !== null)
+      .join("\n");
+    result += `<|im_start|>system\n${systemText}\n<|im_end|>\n`;
+  }
+
+  // 처리: contents 블록 각각 추가
+  contents.forEach(block => {
+    // MODEL 역할은 assistant로 변환, 그 외엔 소문자로 사용
+    let roleLabel = block.role.toLowerCase();
+    if (roleLabel === "model") {
+      roleLabel = "assistant";
+    }
+    // 블록 내용을 결합 (inline_data는 고려하지 않음)
+    const blockText = block.parts
+      .map(part => part.text)
+      .filter(text => text !== undefined && text !== null)
+      .join("\n");
+    result += `<|im_start|>${roleLabel}\n${blockText}\n<|im_end|>\n`;
+  });
+
+  return result.trim();
 }
