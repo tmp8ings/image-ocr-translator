@@ -287,14 +287,50 @@
         }
       });
 
-      function handleImageFile(file) {
-        const imageInput = document.getElementById("imageInput");
-        // Create a new FileList containing the dropped file
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        imageInput.files = dataTransfer.files;
+      // New function to compress images larger than 18MB
+      function compressImage(file, callback) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function(e) {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            // Scale down dimensions (adjust scale factor as needed)
+            const scaleFactor = 0.7;
+            canvas.width = img.width * scaleFactor;
+            canvas.height = img.height * scaleFactor;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Compress to JPEG with quality 0.7
+            canvas.toBlob(function(blob) {
+              callback(blob);
+            }, 'image/jpeg', 0.7);
+          };
+        };
+      }
 
-        previewImage(imageInput);
+      // Modified function to handle image file compression if size exceeds 18MB
+      function handleImageFile(file) {
+        console.log('getting immage...');
+        console.log(file.size)
+        if (file.size > 15 * 1024 * 1024) {
+          console.log('need to compress!');
+          compressImage(file, function(compressedBlob) {
+            const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+            const imageInput = document.getElementById("imageInput");
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(compressedFile);
+            imageInput.files = dataTransfer.files;
+            previewImage(imageInput);
+          });
+        } else {
+          const imageInput = document.getElementById("imageInput");
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          imageInput.files = dataTransfer.files;
+          previewImage(imageInput);
+        }
       }
 
       // Listen for Ctrl+Enter to trigger translation
