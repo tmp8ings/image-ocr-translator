@@ -122,7 +122,7 @@ const translateContent = async (tnote, prompt) => {
 }
 
 function risuToGemini(prompt, tnote, imageBase64) {
-  prompt.replaceAll('{{slot::tnote}}', tnote);
+  prompt = prompt.replaceAll('{{slot::tnote}}', tnote);
   const { systemInstruction, contents } = risuToChatBlock(prompt);
   const imageAddedContents = contents.map(block => {
     const parts = block.parts.map(part => {
